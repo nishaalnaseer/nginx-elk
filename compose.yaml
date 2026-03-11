@@ -1,15 +1,57 @@
 services:
   nginx:
-    image: nginx:logged_nginx
+    image: basednginx
     ports:
-      - "80:80"
-    volume:
+      - "80:8080"
+    volumes:
       - "test_logs:/test_logs"
       - "./nginx/nginx.conf:/etc/nginx/nginx.conf"
       - "./nginx/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf"
       - "./nginx/filebeat.yml:/home/nginx/filebeat/filebeat.yml"
 
+  filebeats:
+    image: filebeats
+    volumes:
+      - "test_logs:/test_logs"
+      - "./filebeats/filebeat.yml:/etc/filebeat/filebeat.yml"
+      - "./filebeats/nginx.yml:/etc/filebeat/modules.d/nginx.yml"
+      
+  logstash:
+    image: docker.elastic.co/logstash/logstash:9.3.1
+    ports:
+      - "5044:5044"
+    volumes:
+      - "./logstash:/usr/share/logstash/pipeline"
+  
+  testapp:
+    image: testapp
+    env_file: "../../../GitHub/dicom-viewer/middleware/.env" 
+
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1-amd64
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.1-amd64
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    
 volumes:
   test_logs:
     external: true
     name: test_logs
+  elasticsearch:
+    external: true
+    name: elasticsearch
